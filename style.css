@@ -7,6 +7,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    text-transform: lowercase;
 }
 
 #app-container {
@@ -106,6 +107,14 @@ canvas {
 .hud-line:last-child {
     margin-bottom: 0;
     color: #0cf;
+}
+
+.hud-hint {
+    font-size: 10px;
+    color: #555;
+    margin-top: 10px;
+    letter-spacing: 1px;
+    font-weight: bold;
 }
 
 #controls {

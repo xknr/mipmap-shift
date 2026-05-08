@@ -27,8 +27,8 @@ function refreshHUD() {
   const delta = (ratio - baseRatio).toFixed(4);
   const deltaStr = (delta >= 0 ? "+" : "") + delta;
 
-  hudLine1.textContent = `LOD: ${lod} (${w}x${h})`;
-  hudLine2.textContent = `RATIO: ${ratio} (${deltaStr})`;
+  hudLine1.textContent = `lod: ${lod} (${w}x${h})`;
+  hudLine2.textContent = `ratio: ${ratio} (${deltaStr})`;
 }
 
 if (!gl) {
@@ -124,7 +124,7 @@ document.getElementById('btn-save').addEventListener('click', () => {
   // 3. Capture
   const link = document.createElement('a');
   const lod = renderMode;
-  const filename = `study_${VIEW_W}x${VIEW_H}_LOD${lod}.png`;
+  const filename = `study_${VIEW_W}x${VIEW_H}_lod${lod}.png`;
   link.download = filename;
   link.href = canvas.toDataURL("image/png");
   link.click();
