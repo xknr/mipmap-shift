@@ -117,6 +117,44 @@ canvas {
     font-weight: bold;
 }
 
+#custom-res-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 4px;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: center;
+}
+
+.input-group input {
+    width: 60px;
+    background: #222;
+    border: 1px solid #444;
+    color: #0f0;
+    padding: 5px;
+    border-radius: 3px;
+    font-family: 'Courier New', Courier, monospace;
+    text-align: center;
+}
+
+.input-group span {
+    color: #666;
+    font-size: 12px;
+}
+
+#btn-apply-custom {
+    padding: 5px;
+    font-size: 11px;
+}
+
 #controls {
     display: flex;
     justify-content: center;

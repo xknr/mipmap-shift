@@ -37,6 +37,8 @@ if (!gl) {
 
 const MAX_CANVAS_W = 800;
 const MAX_CANVAS_H = 600;
+const MIN_CANVAS_W = 400;
+const MIN_CANVAS_H = 300;
 let VIEW_W = 980;
 let VIEW_H = 808;
 
@@ -91,8 +93,22 @@ window.addEventListener('keydown', (e) => {
 });
 
 resSelect.addEventListener('change', (e) => {
-  const [w, h] = e.target.value.split('x').map(Number);
-  initForSize(w, h);
+  const customControls = document.getElementById('custom-res-controls');
+  if (e.target.value === 'custom') {
+    customControls.style.display = 'flex';
+  } else {
+    customControls.style.display = 'none';
+    const [w, h] = e.target.value.split('x').map(Number);
+    initForSize(w, h);
+  }
+});
+
+document.getElementById('btn-apply-custom').addEventListener('click', () => {
+  const w = parseInt(document.getElementById('custom-w').value);
+  const h = parseInt(document.getElementById('custom-h').value);
+  if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+    initForSize(w, h);
+  }
 });
 
 document.getElementById('btn-next').addEventListener('click', () => {
@@ -232,15 +248,41 @@ gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 
 function resize() {
-  let displayW, displayH;
+  const aspect = VIEW_W / VIEW_H;
+  
+  // Start with the natural texture size
+  let displayW = VIEW_W;
+  let displayH = VIEW_H;
 
-  if (VIEW_W / VIEW_H > MAX_CANVAS_W / MAX_CANVAS_H) {
-    displayW = Math.min(MAX_CANVAS_W, VIEW_W);
-    displayH = Math.floor(displayW * VIEW_H / VIEW_W);
-  } else {
-    displayH = Math.min(MAX_CANVAS_H, VIEW_H);
-    displayW = Math.floor(displayH * VIEW_W / VIEW_H);
+  // 1. Calculate the scale required to fit inside MAX bounds
+  const maxScale = Math.min(MAX_CANVAS_W / displayW, MAX_CANVAS_H / displayH);
+  
+  // 2. Calculate the scale required to meet MIN bounds (at least one dimension)
+  const minScale = Math.max(MIN_CANVAS_W / displayW, MIN_CANVAS_H / displayH);
+
+  // We want to scale such that we are as large as possible but within MAX,
+  // while also respecting MIN if possible.
+  let scale = maxScale; 
+  if (scale < minScale) {
+    // If there's a conflict (extreme aspect ratio), minScale would push us out of MAX.
+    // In this case, we prioritize MAX bounds but ensure we don't go below MIN if we can help it.
+    // However, since we MUST preserve aspect ratio, we'll pick the scale that fits the MAX box.
+    scale = maxScale;
   }
+  
+  // If the texture is already smaller than MAX, we don't necessarily want to scale UP 
+  // unless it's smaller than MIN.
+  if (displayW <= MAX_CANVAS_W && displayH <= MAX_CANVAS_H) {
+    scale = Math.max(1.0, minScale); // Only scale up to MIN
+    scale = Math.min(scale, maxScale); // But don't exceed MAX
+  } else {
+    scale = maxScale; // Scale down to fit MAX
+  }
+
+  displayW = Math.floor(VIEW_W * scale);
+  displayH = Math.floor(VIEW_H * scale);
+
+  console.log(`resizing canvas to ${displayW}x${displayH} from ${VIEW_W}x${VIEW_H}`);
 
 
   canvas.width = displayW;

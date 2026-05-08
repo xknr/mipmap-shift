@@ -28,7 +28,16 @@
         <option value="980x808">980 x 808</option>
         <option value="1024x1024">1024 x 1024</option>
         <option value="2048x980">2048 x 980</option>
+        <option value="custom">custom...</option>
       </select>
+      <div id="custom-res-controls" style="display: none;">
+        <div class="input-group">
+          <input type="number" id="custom-w" placeholder="w" value="1920">
+          <span>x</span>
+          <input type="number" id="custom-h" placeholder="h" value="1080">
+        </div>
+        <button id="btn-apply-custom" class="action-btn">apply</button>
+      </div>
       <button id="btn-save" class="action-btn">save png</button>
     </div>
   </div>
