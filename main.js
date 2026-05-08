@@ -36,8 +36,6 @@ function refreshHUD() {
 }
 
 
-const MAX_CANVAS_W = 800, MAX_CANVAS_H = 600;
-const MIN_CANVAS_W = 400, MIN_CANVAS_H = 300;
 let VIEW_W = 980, VIEW_H = 808;
 let renderMode = 0;
 let numLevels = 1;
@@ -93,6 +91,7 @@ resSelect.addEventListener('change', (e) => {
   const customControls = document.getElementById('custom-res-controls');
   if (e.target.value === 'custom') {
     customControls.style.display = 'flex';
+    resize(); // Recalculate layout immediately since UI dimensions just changed
   } else {
     customControls.style.display = 'none';
     const [w, h] = e.target.value.split('x').map(Number);
@@ -249,50 +248,84 @@ gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 
 function resize() {
-  const aspect = VIEW_W / VIEW_H;
-
-  // Start with the natural texture size
-  let displayW = VIEW_W;
-  let displayH = VIEW_H;
-
-  // 1. Calculate the scale required to fit inside MAX bounds
-  const maxScale = Math.min(MAX_CANVAS_W / displayW, MAX_CANVAS_H / displayH);
-
-  // 2. Calculate the scale required to meet MIN bounds (at least one dimension)
-  const minScale = Math.max(MIN_CANVAS_W / displayW, MIN_CANVAS_H / displayH);
-
-  // We want to scale such that we are as large as possible but within MAX,
-  // while also respecting MIN if possible.
-  let scale = maxScale;
-  if (scale < minScale) {
-    // If there's a conflict (extreme aspect ratio), minScale would push us out of MAX.
-    // In this case, we prioritize MAX bounds but ensure we don't go below MIN if we can help it.
-    // However, since we MUST preserve aspect ratio, we'll pick the scale that fits the MAX box.
-    scale = maxScale;
-  }
-
-  // If the texture is already smaller than MAX, we don't necessarily want to scale UP 
-  // unless it's smaller than MIN.
-  if (displayW <= MAX_CANVAS_W && displayH <= MAX_CANVAS_H) {
-    scale = Math.max(1.0, minScale); // Only scale up to MIN
-    scale = Math.min(scale, maxScale); // But don't exceed MAX
+  const padding = 40; // 20px padding * 2
+  const gap = 20; // 20px gap
+  const winW = window.innerWidth - padding;
+  const winH = window.innerHeight - padding;
+  
+  const ui = document.getElementById('ui-container');
+  const app = document.getElementById('app-container');
+  
+  // Temporarily hide canvas and reset UI scale to measure natural sizes
+  canvas.style.display = 'none';
+  ui.style.zoom = 1;
+  ui.style.transform = 'none';
+  
+  // Test Config 1: Bottom (app col, ui row)
+  app.style.flexDirection = 'column';
+  ui.style.flexDirection = 'row';
+  ui.style.flexWrap = 'nowrap'; // force nowrap to measure true required width
+  
+  const uiNatW1 = ui.scrollWidth;
+  const uiNatH1 = ui.offsetHeight;
+  const uiScale1 = Math.min(1.0, winW / uiNatW1);
+  const uiScaledH1 = uiNatH1 * uiScale1;
+  
+  const availW1 = winW;
+  const availH1 = Math.max(1, winH - gap - uiScaledH1);
+  const canvasScale1 = Math.min(availW1 / VIEW_W, availH1 / VIEW_H);
+  
+  // Test Config 2: Right (app row, ui col)
+  app.style.flexDirection = 'row';
+  ui.style.flexDirection = 'column';
+  ui.style.flexWrap = 'nowrap';
+  
+  const uiNatH2 = ui.scrollHeight;
+  const uiNatW2 = ui.offsetWidth;
+  const uiScale2 = Math.min(1.0, winH / uiNatH2);
+  const uiScaledW2 = uiNatW2 * uiScale2;
+  
+  const availW2 = Math.max(1, winW - gap - uiScaledW2);
+  const availH2 = winH;
+  const canvasScale2 = Math.min(availW2 / VIEW_W, availH2 / VIEW_H);
+  
+  let finalCanvasScale;
+  if (canvasScale1 > canvasScale2) {
+    // Config 1 wins
+    app.style.flexDirection = 'column';
+    ui.style.flexDirection = 'row';
+    ui.style.zoom = uiScale1;
+    // Fallback for browsers that don't support zoom
+    if (uiScale1 !== 1 && CSS.supports && !CSS.supports('zoom: 1')) {
+      ui.style.transform = `scale(${uiScale1})`;
+      ui.style.transformOrigin = 'top center';
+    }
+    finalCanvasScale = canvasScale1;
   } else {
-    scale = maxScale; // Scale down to fit MAX
+    // Config 2 wins
+    app.style.flexDirection = 'row';
+    ui.style.flexDirection = 'column';
+    ui.style.zoom = uiScale2;
+    // Fallback for browsers that don't support zoom
+    if (uiScale2 !== 1 && CSS.supports && !CSS.supports('zoom: 1')) {
+      ui.style.transform = `scale(${uiScale2})`;
+      ui.style.transformOrigin = 'left center';
+    }
+    finalCanvasScale = canvasScale2;
   }
-
-  displayW = Math.floor(VIEW_W * scale);
-  displayH = Math.floor(VIEW_H * scale);
-
+  
+  // Restore canvas display
+  canvas.style.display = 'block';
+  
+  let displayW = Math.max(1, Math.floor(VIEW_W * finalCanvasScale));
+  let displayH = Math.max(1, Math.floor(VIEW_H * finalCanvasScale));
+  
   console.log(`resizing canvas to ${displayW}x${displayH} from ${VIEW_W}x${VIEW_H}`);
-
-
+  
   canvas.width = displayW;
   canvas.height = displayH;
   canvas.style.width = displayW + 'px';
   canvas.style.height = displayH + 'px';
-
-  document.getElementById('status-bar').style.width = displayW + 'px';
-  document.getElementById('controls').style.width = displayW + 'px';
 }
 window.addEventListener('resize', resize);
 resize();
