@@ -11,13 +11,13 @@
 <body>
   <div id="app-container">
     <canvas id="glCanvas"></canvas>
-    
+
     <div id="ui-container">
       <div class="panel-box" id="nav-panel">
         <div id="status-bar">
           <div id="hud-line1" class="hud-line"></div>
           <div id="hud-line2" class="hud-line"></div>
-          <div id="hud-hint" class="hud-hint">use left/right arrows to navigate</div>
+          <div id="hud-hint" class="hud-hint">use arrows or left/right<br>cursor keys to show a lod level</div>
         </div>
         <div id="controls">
           <button id="btn-prev" class="nav-btn">◀</button>
@@ -28,9 +28,12 @@
       <div class="panel-box" id="settings-panel">
         <label for="res-select">texture size:</label>
         <select id="res-select">
+          <option value="512x191">512 x 191</option>
           <option value="980x808">980 x 808</option>
-          <option value="1024x1024">1024 x 1024</option>
+          <option value="128x67">128 x 67</option>
+          <option value="1920x1080">1920 x 1080</option>
           <option value="2048x980">2048 x 980</option>
+          <option value="1024x1024">1024 x 1024</option>
           <option value="custom">custom...</option>
         </select>
         <div id="custom-res-controls" style="display: none;">

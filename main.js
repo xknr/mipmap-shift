@@ -248,8 +248,8 @@ gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 
 function resize() {
-  const padding = 40; // 20px padding * 2
-  const gap = 20; // 20px gap
+  const padding = 20; // 10px padding * 2
+  const gap = 10; // 10px gap
   const winW = window.innerWidth - padding;
   const winH = window.innerHeight - padding;
   
