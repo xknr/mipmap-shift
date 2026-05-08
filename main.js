@@ -104,9 +104,13 @@ resSelect.addEventListener('change', (e) => {
 });
 
 document.getElementById('btn-apply-custom').addEventListener('click', () => {
-  const w = parseInt(document.getElementById('custom-w').value);
-  const h = parseInt(document.getElementById('custom-h').value);
-  if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+  let w = parseInt(document.getElementById('custom-w').value);
+  let h = parseInt(document.getElementById('custom-h').value);
+  if (!isNaN(w) && !isNaN(h)) {
+    w = Math.max(6, Math.min(2048, w));
+    h = Math.max(6, Math.min(2048, h));
+    document.getElementById('custom-w').value = w;
+    document.getElementById('custom-h').value = h;
     initForSize(w, h);
   }
 });
