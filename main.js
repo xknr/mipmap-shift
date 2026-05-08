@@ -1,5 +1,9 @@
 const canvas = document.getElementById('glCanvas');
 const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+if (!gl) {
+  alert("WebGL 2 not supported");
+  throw new Error("WebGL 2 not supported");
+}
 
 const hudLine1 = document.getElementById('hud-line1');
 const hudLine2 = document.getElementById('hud-line2');
@@ -31,17 +35,10 @@ function refreshHUD() {
   hudLine2.textContent = `ratio: ${ratio} (${deltaStr})`;
 }
 
-if (!gl) {
-  alert("WebGL 2 not supported");
-}
 
-const MAX_CANVAS_W = 800;
-const MAX_CANVAS_H = 600;
-const MIN_CANVAS_W = 400;
-const MIN_CANVAS_H = 300;
-let VIEW_W = 980;
-let VIEW_H = 808;
-
+const MAX_CANVAS_W = 800, MAX_CANVAS_H = 600;
+const MIN_CANVAS_W = 400, MIN_CANVAS_H = 300;
+let VIEW_W = 980, VIEW_H = 808;
 let renderMode = 0;
 let numLevels = 1;
 
@@ -253,27 +250,27 @@ gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 function resize() {
   const aspect = VIEW_W / VIEW_H;
-  
+
   // Start with the natural texture size
   let displayW = VIEW_W;
   let displayH = VIEW_H;
 
   // 1. Calculate the scale required to fit inside MAX bounds
   const maxScale = Math.min(MAX_CANVAS_W / displayW, MAX_CANVAS_H / displayH);
-  
+
   // 2. Calculate the scale required to meet MIN bounds (at least one dimension)
   const minScale = Math.max(MIN_CANVAS_W / displayW, MIN_CANVAS_H / displayH);
 
   // We want to scale such that we are as large as possible but within MAX,
   // while also respecting MIN if possible.
-  let scale = maxScale; 
+  let scale = maxScale;
   if (scale < minScale) {
     // If there's a conflict (extreme aspect ratio), minScale would push us out of MAX.
     // In this case, we prioritize MAX bounds but ensure we don't go below MIN if we can help it.
     // However, since we MUST preserve aspect ratio, we'll pick the scale that fits the MAX box.
     scale = maxScale;
   }
-  
+
   // If the texture is already smaller than MAX, we don't necessarily want to scale UP 
   // unless it's smaller than MIN.
   if (displayW <= MAX_CANVAS_W && displayH <= MAX_CANVAS_H) {
