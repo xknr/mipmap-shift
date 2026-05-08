@@ -1,2 +1,3 @@
-/gif/*.png
-/gif/*.gif
+/gif/*/*.png
+/gif/*/*.gif
+*.png
