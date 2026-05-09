@@ -389,10 +389,6 @@ class Gui {
   }
 }
 
-const gui = new Gui();
-
-
-
 const vsSource = `#version 300 es
 layout(location = 0) in vec2 aPos;
 out vec2 vTex;
@@ -445,9 +441,10 @@ void main() {
   outColor = textureLod(uTex, vTex, uLod);
 }`;
 
-const model = new Model();
-const webgl = new Webgl();
 const graphics = new Graphics();
+const webgl = new Webgl();
+const model = new Model();
+const gui = new Gui();
 
 webgl.init();
 graphics.init(vsSource, fsSource, blitFsSource, mipFsSource);
