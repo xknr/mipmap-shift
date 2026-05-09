@@ -24,8 +24,6 @@ async function renderMarkdown() {
   }
 }
 
-
-
 class Model {
   constructor() {
     this.viewW = 980;
@@ -195,6 +193,7 @@ class Gui {
     this.btnSave = document.getElementById('btn-save');
     this.uiContainer = document.getElementById('ui-container');
     this.appContainer = document.getElementById('app-container');
+    this.doPrintLayoutExtents = false;
   }
 
   calibrate() {
@@ -226,7 +225,7 @@ class Gui {
     this.appContainer.style.flexDirection = originalFlex;
     this.uiContainer.style.flexDirection = originalUiFlex;
     this.uiContainer.style.zoom = originalZoom;
-    
+
     return { rowW, rowH, colW, colH };
   }
 
@@ -263,7 +262,7 @@ class Gui {
   resize() {
     const { rowW, rowH, colW, colH } = this.calibrate();
 
-    const padding = 20; 
+    const padding = 20;
     const gap = 10;
     const canvasBorder = 4;
     const safety = 4;
@@ -315,77 +314,84 @@ class Gui {
     this.canvas.style.height = displayH + 'px';
     this.canvas.style.display = 'block';
 
-    // Logs
+    if (this.doPrintLayoutExtents)
+      this.printLayoutExtents(isVertical, finalCanvasScale, finalUiScale);
+  }
+
+  printLayoutExtents(isVertical, finalCanvasScale, finalUiScale) {
     const cRect = this.canvas.getBoundingClientRect();
     const uRect = this.uiContainer.getBoundingClientRect();
+    const vW = document.documentElement.clientWidth;
+    const vH = document.documentElement.clientHeight;
+
     console.log(`config: ${isVertical ? 'BOTTOM' : 'RIGHT'}, scales: [canvas=${finalCanvasScale.toFixed(3)}, ui=${finalUiScale.toFixed(3)}]`);
-    console.log(`viewport: ${vW + padding + safety}x${vH + padding + safety}`);
+    console.log(`viewport: ${vW}x${vH}`);
     console.log(`canvas:  [${cRect.left.toFixed(1)}, ${cRect.top.toFixed(1)}] to [${cRect.right.toFixed(1)}, ${cRect.bottom.toFixed(1)}]`);
     console.log(`ui:      [${uRect.left.toFixed(1)}, ${uRect.top.toFixed(1)}] to [${uRect.right.toFixed(1)}, ${uRect.bottom.toFixed(1)}]`);
   }
+
+  init() {
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ArrowRight') {
+        this.setRenderMode(model.advRenderMode(1));
+        e.preventDefault();
+      }
+      if (e.code === 'ArrowLeft') {
+        this.setRenderMode(model.advRenderMode(-1));
+        e.preventDefault();
+      }
+    });
+
+    this.resSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'custom') {
+        this.customControls.style.display = 'flex';
+        this.resize();
+      } else {
+        this.customControls.style.display = 'none';
+        const [w, h] = e.target.value.split('x').map(Number);
+        this.initForSize(w, h);
+      }
+    });
+
+    this.btnApplyCustom.addEventListener('click', () => {
+      let w = parseInt(this.customW.value);
+      let h = parseInt(this.customH.value);
+      if (!isNaN(w) && !isNaN(h)) {
+        w = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, w));
+        h = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, h));
+        this.customW.value = w;
+        this.customH.value = h;
+        this.initForSize(w, h);
+      }
+    });
+
+    this.btnNext.addEventListener('click', () => {
+      this.setRenderMode(model.advRenderMode(1));
+    });
+
+    this.btnPrev.addEventListener('click', () => {
+      this.setRenderMode(model.advRenderMode(-1));
+    });
+
+    this.btnSave.addEventListener('click', () => {
+      this.canvas.width = model.viewW;
+      this.canvas.height = model.viewH;
+      graphics.render();
+      const link = document.createElement('a');
+      const filename = `study_${model.viewW}x${model.viewH}_lod${model.renderMode}.png`;
+      link.download = filename;
+      link.href = this.canvas.toDataURL("image/png");
+      link.click();
+      this.resize();
+    });
+
+    window.addEventListener('resize', () => this.resize());
+  }
 }
 
-const model = new Model();
-const webgl = new Webgl();
 const gui = new Gui();
-const graphics = new Graphics();
 
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'ArrowRight') {
-    gui.setRenderMode(model.advRenderMode(1));
-    e.preventDefault();
-  }
-  if (e.code === 'ArrowLeft') {
-    gui.setRenderMode(model.advRenderMode(-1));
-    e.preventDefault();
-  }
-});
 
-gui.resSelect.addEventListener('change', (e) => {
-  if (e.target.value === 'custom') {
-    gui.customControls.style.display = 'flex';
-    gui.resize();
-  } else {
-    gui.customControls.style.display = 'none';
-    const [w, h] = e.target.value.split('x').map(Number);
-    gui.initForSize(w, h);
-  }
-});
-
-gui.btnApplyCustom.addEventListener('click', () => {
-  let w = parseInt(gui.customW.value);
-  let h = parseInt(gui.customH.value);
-  if (!isNaN(w) && !isNaN(h)) {
-    w = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, w));
-    h = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, h));
-    gui.customW.value = w;
-    gui.customH.value = h;
-    gui.initForSize(w, h);
-  }
-});
-
-gui.btnNext.addEventListener('click', () => {
-  gui.setRenderMode(model.advRenderMode(1));
-});
-
-gui.btnPrev.addEventListener('click', () => {
-  gui.setRenderMode(model.advRenderMode(-1));
-});
-
-gui.btnSave.addEventListener('click', () => {
-  gui.canvas.width = model.viewW;
-  gui.canvas.height = model.viewH;
-
-  graphics.render();
-
-  const link = document.createElement('a');
-  const filename = `study_${model.viewW}x${model.viewH}_lod${model.renderMode}.png`;
-  link.download = filename;
-  link.href = gui.canvas.toDataURL("image/png");
-  link.click();
-
-  gui.resize();
-});
 
 const vsSource = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -439,11 +445,15 @@ void main() {
   outColor = textureLod(uTex, vTex, uLod);
 }`;
 
+const model = new Model();
+const webgl = new Webgl();
+const graphics = new Graphics();
+
 webgl.init();
 graphics.init(vsSource, fsSource, blitFsSource, mipFsSource);
 graphics.initBuffers();
+gui.init();
 gui.refreshHUD();
-window.addEventListener('resize', () => gui.resize());
 gui.resize();
 renderMarkdown();
 
