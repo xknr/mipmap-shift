@@ -13,7 +13,6 @@ body {
   align-items: center;
   justify-content: flex-start;
   min-height: 100vh;
-  text-transform: lowercase;
   overflow-x: hidden;
 }
 
@@ -214,6 +213,7 @@ canvas {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
   position: relative;
   margin-bottom: 50px;
+  text-transform: none;
 }
 
 .loading-spinner {

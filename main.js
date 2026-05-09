@@ -18,7 +18,7 @@ async function renderMarkdown() {
   } catch (err) {
     target.innerHTML = `
       <div style="color:#ff4444; text-align:center; padding: 20px;">
-        <h3>Error loading README.md</h3>
+        <h3>error loading readme.md</h3>
         <p>${err.message}</p>
       </div>`;
   }
@@ -324,7 +324,7 @@ class Gui {
     const vW = document.documentElement.clientWidth;
     const vH = document.documentElement.clientHeight;
 
-    console.log(`config: ${isVertical ? 'BOTTOM' : 'RIGHT'}, scales: [canvas=${finalCanvasScale.toFixed(3)}, ui=${finalUiScale.toFixed(3)}]`);
+    console.log(`config: ${isVertical ? 'bottom' : 'right'}, scales: [canvas=${finalCanvasScale.toFixed(3)}, ui=${finalUiScale.toFixed(3)}]`);
     console.log(`viewport: ${vW}x${vH}`);
     console.log(`canvas:  [${cRect.left.toFixed(1)}, ${cRect.top.toFixed(1)}] to [${cRect.right.toFixed(1)}, ${cRect.bottom.toFixed(1)}]`);
     console.log(`ui:      [${uRect.left.toFixed(1)}, ${uRect.top.toFixed(1)}] to [${uRect.right.toFixed(1)}, ${uRect.bottom.toFixed(1)}]`);
