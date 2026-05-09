@@ -1,4 +1,7 @@
-class Webgl {
+const MIN_TEXTURE_SIZE = 6;
+const MAX_TEXTURE_SIZE = 2048;
+
+class Graphics {
   constructor(gl) {
     this.gl = gl;
     this.prog = null;
@@ -113,7 +116,7 @@ class Gui {
 
   initBuffers() {
     const numLevels = this.calculateNumLevels();
-    wg.initBuffers(this.viewW, this.viewH, numLevels);
+    graphics.initBuffers(this.viewW, this.viewH, numLevels);
   }
 
   initForSize(w, h) {
@@ -205,7 +208,7 @@ if (!gl) {
   throw new Error("WebGL 2 not supported");
 }
 
-const wg = new Webgl(gl);
+const graphics = new Graphics(gl);
 
 
 
@@ -235,8 +238,8 @@ gui.btnApplyCustom.addEventListener('click', () => {
   let w = parseInt(gui.customW.value);
   let h = parseInt(gui.customH.value);
   if (!isNaN(w) && !isNaN(h)) {
-    w = Math.max(6, Math.min(2048, w));
-    h = Math.max(6, Math.min(2048, h));
+    w = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, w));
+    h = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, h));
     gui.customW.value = w;
     gui.customH.value = h;
     gui.initForSize(w, h);
@@ -255,13 +258,13 @@ gui.btnSave.addEventListener('click', () => {
   gui.canvas.width = gui.viewW;
   gui.canvas.height = gui.viewH;
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, wg.fbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, graphics.fbo);
   gl.viewport(0, 0, gui.viewW, gui.viewH);
-  gl.useProgram(wg.prog);
-  gl.uniform1f(wg.uAspectLoc, gui.viewW / gui.viewH);
-  gl.bindVertexArray(wg.vao);
+  gl.useProgram(graphics.prog);
+  gl.uniform1f(graphics.uAspectLoc, gui.viewW / gui.viewH);
+  gl.bindVertexArray(graphics.vao);
   gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-  gl.bindTexture(gl.TEXTURE_2D, wg.tex);
+  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
   gl.generateMipmap(gl.TEXTURE_2D);
   drawOutput(gui.viewW, gui.viewH);
 
@@ -354,7 +357,7 @@ function createProgram(gl, vSrc, fSrc) {
   return program;
 }
 
-wg.init(vsSource, fsSource, blitFsSource, mipFsSource);
+graphics.init(vsSource, fsSource, blitFsSource, mipFsSource);
 gui.initBuffers();
 gui.refreshHUD();
 window.addEventListener('resize', () => gui.resize());
@@ -364,32 +367,32 @@ function drawOutput(targetW, targetH) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, targetW, targetH);
 
-  gl.useProgram(wg.mipProg);
-  gl.bindTexture(gl.TEXTURE_2D, wg.tex);
+  gl.useProgram(graphics.mipProg);
+  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
-  gl.uniform1f(wg.uMipLodLoc, gui.renderMode);
+  gl.uniform1f(graphics.uMipLodLoc, gui.renderMode);
 
-  gl.bindVertexArray(wg.vao);
+  gl.bindVertexArray(graphics.vao);
   gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
 
 function render() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, wg.fbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, graphics.fbo);
   gl.viewport(0, 0, gui.viewW, gui.viewH);
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  gl.useProgram(wg.prog);
-  gl.uniform1f(wg.uAspectLoc, gui.viewW / gui.viewH);
-  gl.bindVertexArray(wg.vao);
+  gl.useProgram(graphics.prog);
+  gl.uniform1f(graphics.uAspectLoc, gui.viewW / gui.viewH);
+  gl.bindVertexArray(graphics.vao);
   gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
-  gl.bindTexture(gl.TEXTURE_2D, wg.tex);
+  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
   gl.generateMipmap(gl.TEXTURE_2D);
 
   drawOutput(gui.canvas.width, gui.canvas.height);
 
-  gl.bindTexture(gl.TEXTURE_2D, wg.tex);
+  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
   requestAnimationFrame(render);
