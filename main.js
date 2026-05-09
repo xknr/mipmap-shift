@@ -1,6 +1,24 @@
 const MIN_TEXTURE_SIZE = 6;
 const MAX_TEXTURE_SIZE = 2048;
 
+import { marked } from './lib/marked.esm.js';
+
+async function renderMarkdown() {
+  const target = document.getElementById('readme-view');
+  try {
+    const response = await fetch('README.md');
+    if (!response.ok) throw new Error('File not found');
+
+    const text = await response.text();
+
+    // With ESM, you use marked.parse()
+    target.innerHTML = marked.parse(text);
+  } catch (err) {
+    target.innerHTML = `<p style="color:red">${err.message}</p>`;
+  }
+}
+
+renderMarkdown();
 
 class Model {
   constructor() {
