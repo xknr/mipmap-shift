@@ -195,12 +195,6 @@ class Gui {
     this.btnSave = document.getElementById('btn-save');
     this.uiContainer = document.getElementById('ui-container');
     this.appContainer = document.getElementById('app-container');
-    
-    // Calibration data
-    this.uiNatW_Row = 0;
-    this.uiNatH_Row = 0;
-    this.uiNatW_Col = 0;
-    this.uiNatH_Col = 0;
   }
 
   calibrate() {
@@ -217,15 +211,15 @@ class Gui {
     this.appContainer.style.flexDirection = 'column';
     this.uiContainer.style.flexDirection = 'row';
     let r = this.uiContainer.getBoundingClientRect();
-    this.uiNatW_Row = r.width;
-    this.uiNatH_Row = r.height;
+    const rowW = r.width;
+    const rowH = r.height;
 
     // Measure Col (Right)
     this.appContainer.style.flexDirection = 'row';
     this.uiContainer.style.flexDirection = 'column';
     r = this.uiContainer.getBoundingClientRect();
-    this.uiNatW_Col = r.width;
-    this.uiNatH_Col = r.height;
+    const colW = r.width;
+    const colH = r.height;
 
     // Restore
     this.canvas.style.display = originalDisplay;
@@ -233,7 +227,7 @@ class Gui {
     this.uiContainer.style.flexDirection = originalUiFlex;
     this.uiContainer.style.zoom = originalZoom;
     
-    console.log(`calibrated: Row[${this.uiNatW_Row}x${this.uiNatH_Row}], Col[${this.uiNatW_Col}x${this.uiNatH_Col}]`);
+    return { rowW, rowH, colW, colH };
   }
 
   refreshHUD() {
@@ -267,7 +261,7 @@ class Gui {
   }
 
   resize() {
-    if (!this.uiNatH_Row) this.calibrate();
+    const { rowW, rowH, colW, colH } = this.calibrate();
 
     const padding = 20; 
     const gap = 10;
@@ -277,15 +271,15 @@ class Gui {
     const vH = document.documentElement.clientHeight - padding - safety;
 
     // Calc Config 1: BOTTOM
-    const uiScale1 = Math.min(1.0, vW / this.uiNatW_Row);
-    const uiH1 = this.uiNatH_Row * uiScale1;
+    const uiScale1 = Math.min(1.0, vW / rowW);
+    const uiH1 = rowH * uiScale1;
     const availW1 = vW - canvasBorder;
     const availH1 = Math.max(1, vH - gap - uiH1 - canvasBorder);
     const canvasScale1 = Math.min(availW1 / model.viewW, availH1 / model.viewH);
 
     // Calc Config 2: RIGHT
-    const uiScale2 = Math.min(1.0, vH / this.uiNatH_Col);
-    const uiW2 = this.uiNatW_Col * uiScale2;
+    const uiScale2 = Math.min(1.0, vH / colH);
+    const uiW2 = colW * uiScale2;
     const availW2 = Math.max(1, vW - gap - uiW2 - canvasBorder);
     const availH2 = vH - canvasBorder;
     const canvasScale2 = Math.min(availW2 / model.viewW, availH2 / model.viewH);
