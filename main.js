@@ -1,24 +1,30 @@
+import { marked } from './lib/marked.esm.js';
+
 const MIN_TEXTURE_SIZE = 6;
 const MAX_TEXTURE_SIZE = 2048;
-
-import { marked } from './lib/marked.esm.js';
 
 async function renderMarkdown() {
   const target = document.getElementById('readme-view');
   try {
     const response = await fetch('README.md');
-    if (!response.ok) throw new Error('File not found');
+    if (!response.ok) throw new Error('README.md not found');
 
     const text = await response.text();
 
-    // With ESM, you use marked.parse()
     target.innerHTML = marked.parse(text);
+    if (typeof gui !== 'undefined') {
+      requestAnimationFrame(() => gui.resize());
+    }
   } catch (err) {
-    target.innerHTML = `<p style="color:red">${err.message}</p>`;
+    target.innerHTML = `
+      <div style="color:#ff4444; text-align:center; padding: 20px;">
+        <h3>Error loading README.md</h3>
+        <p>${err.message}</p>
+      </div>`;
   }
 }
 
-renderMarkdown();
+
 
 class Model {
   constructor() {
@@ -189,6 +195,45 @@ class Gui {
     this.btnSave = document.getElementById('btn-save');
     this.uiContainer = document.getElementById('ui-container');
     this.appContainer = document.getElementById('app-container');
+    
+    // Calibration data
+    this.uiNatW_Row = 0;
+    this.uiNatH_Row = 0;
+    this.uiNatW_Col = 0;
+    this.uiNatH_Col = 0;
+  }
+
+  calibrate() {
+    const originalDisplay = this.canvas.style.display;
+    const originalFlex = this.appContainer.style.flexDirection;
+    const originalUiFlex = this.uiContainer.style.flexDirection;
+    const originalZoom = this.uiContainer.style.zoom;
+
+    this.canvas.style.display = 'none';
+    this.uiContainer.style.zoom = 1;
+    this.uiContainer.style.transform = 'none';
+
+    // Measure Row (Bottom)
+    this.appContainer.style.flexDirection = 'column';
+    this.uiContainer.style.flexDirection = 'row';
+    let r = this.uiContainer.getBoundingClientRect();
+    this.uiNatW_Row = r.width;
+    this.uiNatH_Row = r.height;
+
+    // Measure Col (Right)
+    this.appContainer.style.flexDirection = 'row';
+    this.uiContainer.style.flexDirection = 'column';
+    r = this.uiContainer.getBoundingClientRect();
+    this.uiNatW_Col = r.width;
+    this.uiNatH_Col = r.height;
+
+    // Restore
+    this.canvas.style.display = originalDisplay;
+    this.appContainer.style.flexDirection = originalFlex;
+    this.uiContainer.style.flexDirection = originalUiFlex;
+    this.uiContainer.style.zoom = originalZoom;
+    
+    console.log(`calibrated: Row[${this.uiNatW_Row}x${this.uiNatH_Row}], Col[${this.uiNatW_Col}x${this.uiNatH_Col}]`);
   }
 
   refreshHUD() {
@@ -222,77 +267,67 @@ class Gui {
   }
 
   resize() {
-    const padding = 20; // 10px padding * 2
-    const gap = 10; // 10px gap
-    const winW = window.innerWidth - padding;
-    const winH = window.innerHeight - padding;
+    if (!this.uiNatH_Row) this.calibrate();
 
-    // Temporarily hide canvas and reset UI scale to measure natural sizes
-    this.canvas.style.display = 'none';
-    this.uiContainer.style.zoom = 1;
-    this.uiContainer.style.transform = 'none';
+    const padding = 20; 
+    const gap = 10;
+    const canvasBorder = 4;
+    const safety = 4;
+    const vW = document.documentElement.clientWidth - padding - safety;
+    const vH = document.documentElement.clientHeight - padding - safety;
 
-    // Test Config 1: Bottom (app col, ui row)
-    this.appContainer.style.flexDirection = 'column';
-    this.uiContainer.style.flexDirection = 'row';
-    this.uiContainer.style.flexWrap = 'nowrap';
-
-    const uiNatW1 = this.uiContainer.scrollWidth;
-    const uiNatH1 = this.uiContainer.offsetHeight;
-    const uiScale1 = Math.min(1.0, winW / uiNatW1);
-    const uiScaledH1 = uiNatH1 * uiScale1;
-
-    const availW1 = winW;
-    const availH1 = Math.max(1, winH - gap - uiScaledH1);
+    // Calc Config 1: BOTTOM
+    const uiScale1 = Math.min(1.0, vW / this.uiNatW_Row);
+    const uiH1 = this.uiNatH_Row * uiScale1;
+    const availW1 = vW - canvasBorder;
+    const availH1 = Math.max(1, vH - gap - uiH1 - canvasBorder);
     const canvasScale1 = Math.min(availW1 / model.viewW, availH1 / model.viewH);
 
-    // Test Config 2: Right (app row, ui col)
-    this.appContainer.style.flexDirection = 'row';
-    this.uiContainer.style.flexDirection = 'column';
-    this.uiContainer.style.flexWrap = 'nowrap';
-
-    const uiNatH2 = this.uiContainer.scrollHeight;
-    const uiNatW2 = this.uiContainer.offsetWidth;
-    const uiScale2 = Math.min(1.0, winH / uiNatH2);
-    const uiScaledW2 = uiNatW2 * uiScale2;
-
-    const availW2 = Math.max(1, winW - gap - uiScaledW2);
-    const availH2 = winH;
+    // Calc Config 2: RIGHT
+    const uiScale2 = Math.min(1.0, vH / this.uiNatH_Col);
+    const uiW2 = this.uiNatW_Col * uiScale2;
+    const availW2 = Math.max(1, vW - gap - uiW2 - canvasBorder);
+    const availH2 = vH - canvasBorder;
     const canvasScale2 = Math.min(availW2 / model.viewW, availH2 / model.viewH);
 
-    let finalCanvasScale;
-    if (canvasScale1 > canvasScale2) {
-      // Config 1 wins
+    let finalCanvasScale, finalUiScale, isVertical;
+
+    if (canvasScale1 >= canvasScale2) {
+      isVertical = true;
+      finalCanvasScale = canvasScale1;
+      finalUiScale = uiScale1;
       this.appContainer.style.flexDirection = 'column';
       this.uiContainer.style.flexDirection = 'row';
-      this.uiContainer.style.zoom = uiScale1;
-      if (uiScale1 !== 1 && CSS.supports && !CSS.supports('zoom: 1')) {
-        this.uiContainer.style.transform = `scale(${uiScale1})`;
-        this.uiContainer.style.transformOrigin = 'top center';
-      }
-      finalCanvasScale = canvasScale1;
     } else {
-      // Config 2 wins
+      isVertical = false;
+      finalCanvasScale = canvasScale2;
+      finalUiScale = uiScale2;
       this.appContainer.style.flexDirection = 'row';
       this.uiContainer.style.flexDirection = 'column';
-      this.uiContainer.style.zoom = uiScale2;
-      if (uiScale2 !== 1 && CSS.supports && !CSS.supports('zoom: 1')) {
-        this.uiContainer.style.transform = `scale(${uiScale2})`;
-        this.uiContainer.style.transformOrigin = 'left center';
-      }
-      finalCanvasScale = canvasScale2;
     }
 
-    this.canvas.style.display = 'block';
+    // Apply scaling
+    this.uiContainer.style.zoom = finalUiScale;
+    if (finalUiScale !== 1 && CSS.supports && !CSS.supports('zoom: 1')) {
+      this.uiContainer.style.transform = `scale(${finalUiScale})`;
+      this.uiContainer.style.transformOrigin = isVertical ? 'top center' : 'left center';
+    }
 
-    let displayW = Math.max(1, Math.floor(model.viewW * finalCanvasScale));
-    let displayH = Math.max(1, Math.floor(model.viewH * finalCanvasScale));
-
-    console.log(`resizing canvas to ${displayW}x${displayH} from ${model.viewW}x${model.viewH}`);
+    const displayW = Math.floor(model.viewW * finalCanvasScale);
+    const displayH = Math.floor(model.viewH * finalCanvasScale);
     this.canvas.width = displayW;
     this.canvas.height = displayH;
     this.canvas.style.width = displayW + 'px';
     this.canvas.style.height = displayH + 'px';
+    this.canvas.style.display = 'block';
+
+    // Logs
+    const cRect = this.canvas.getBoundingClientRect();
+    const uRect = this.uiContainer.getBoundingClientRect();
+    console.log(`config: ${isVertical ? 'BOTTOM' : 'RIGHT'}, scales: [canvas=${finalCanvasScale.toFixed(3)}, ui=${finalUiScale.toFixed(3)}]`);
+    console.log(`viewport: ${vW + padding + safety}x${vH + padding + safety}`);
+    console.log(`canvas:  [${cRect.left.toFixed(1)}, ${cRect.top.toFixed(1)}] to [${cRect.right.toFixed(1)}, ${cRect.bottom.toFixed(1)}]`);
+    console.log(`ui:      [${uRect.left.toFixed(1)}, ${uRect.top.toFixed(1)}] to [${uRect.right.toFixed(1)}, ${uRect.bottom.toFixed(1)}]`);
   }
 }
 
@@ -416,6 +451,7 @@ graphics.initBuffers();
 gui.refreshHUD();
 window.addEventListener('resize', () => gui.resize());
 gui.resize();
+renderMarkdown();
 
 function render() {
   graphics.render();
