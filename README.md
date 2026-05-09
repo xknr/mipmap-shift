@@ -20,7 +20,7 @@ This results in a phase shift **if the aspect ratio changes** between levels. Th
 - **317x317**: Stays stable. Both axes hit the "odd-number wall" simultaneously, maintaining a consistent 1:1 ratio.
 - **2048x910**: Triggers a phase shift. The height becomes fractional ($910 \to 455 \to \lfloor 227.5 \rfloor$) while the width remains a clean power of two and never requires rounding.
 
-## Calculating texture sizes that cause this
+## Calculating texture sizes which can cause this problem
 
 Mip sizes are calculated as: `floor(originalSize / 2^mipLevel)`.
 
