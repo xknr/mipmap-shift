@@ -1,0 +1,3 @@
+ffmpeg -framerate 1.6 -i study_980x808_LOD%d.png \
+-vf "drawtext=fontfile=/path/to/font.ttf:text='LOD %{eif\\:n+1\\:d}':x=w-text_w-10:y=h-text_h-10:fontsize=48:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=6,scale=iw/3:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+-loop 0 output.gif
