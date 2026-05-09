@@ -12,13 +12,12 @@ async function renderMarkdown() {
     const text = await response.text();
 
     target.innerHTML = marked.parse(text);
-    if (typeof gui !== 'undefined') {
-      requestAnimationFrame(() => gui.resize());
-    }
+    // note: make sure gui is initialized at this point
+    requestAnimationFrame(() => gui.resize());
   } catch (err) {
     target.innerHTML = `
       <div style="color:#ff4444; text-align:center; padding: 20px;">
-        <h3>error loading readme.md</h3>
+        <h3>error loading README.md</h3>
         <p>${err.message}</p>
       </div>`;
   }
@@ -45,8 +44,14 @@ class Model {
     return levels;
   }
 
-  advRenderMode(offset) {
+  offsetRenderMode(offset) {
     return (this.renderMode + offset + this.numLevels) % this.numLevels;
+  }
+
+  setRenderMode(mode) {
+    this.renderMode = mode;
+    gui.refreshHUD();
+    graphics.requestRender();
   }
 }
 
@@ -86,24 +91,34 @@ class Webgl {
     gl.deleteShader(fShader);
     return program;
   }
+  initContextLossHandling() {
+    gui.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('webgl context lost');
+    }, false);
+
+    gui.canvas.addEventListener('webglcontextrestored', () => {
+      console.log('webgl context restored');
+      initGraphics();
+    }, false);
+  }
 }
 
 class Graphics {
-  constructor() {
-    this.prog = null;
-    this.blitProg = null;
-    this.mipProg = null;
-    this.uTexLoc = null;
-    this.uAspectLoc = null;
-    this.uMipTexLoc = null;
-    this.uMipLodLoc = null;
-    this.tex = null;
-    this.fbo = null;
-    this.vao = null;
-    this.vbo = null;
-  }
+  prog = null;
+  blitProg = null;
+  mipProg = null;
+  uTexLoc = null;
+  uAspectLoc = null;
+  uMipTexLoc = null;
+  uMipLodLoc = null;
+  tex = null;
+  fbo = null;
+  vao = null;
+  vbo = null;
+  renderRequested = false;
 
-  init(vsSource, fsSource, blitFsSource, mipFsSource) {
+  init() {
     const gl = webgl.gl;
     this.prog = webgl.createProgram(vsSource, fsSource);
     this.blitProg = webgl.createProgram(vsSource, blitFsSource);
@@ -120,6 +135,8 @@ class Graphics {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    this.initBuffers();
   }
 
   initBuffers() {
@@ -144,24 +161,37 @@ class Graphics {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.tex, 0);
   }
 
+  requestRender() {
+    if (this.renderRequested)
+      return;
+    this.renderRequested = true;
+    requestAnimationFrame(() => {
+      this.render();
+      this.renderRequested = false;
+    });
+  }
+
   render() {
     const gl = webgl.gl;
+    const viewW = model.viewW;
+    const viewH = model.viewH;
+    const targetW = gui.canvas.width;
+    const targetH = gui.canvas.height;
+    const renderMode = model.renderMode;
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-    gl.viewport(0, 0, model.viewW, model.viewH);
+    gl.viewport(0, 0, viewW, viewH);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(this.prog);
-    gl.uniform1f(this.uAspectLoc, model.viewW / model.viewH);
+    gl.uniform1f(this.uAspectLoc, viewW / viewH);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    const targetW = gui.canvas.width;
-    const targetH = gui.canvas.height;
-    const renderMode = model.renderMode;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, targetW, targetH);
 
@@ -246,21 +276,18 @@ class Gui {
     this.hudLine2.textContent = `ratio: ${ratio} (${deltaStr})`;
   }
 
-  setRenderMode(mode) {
-    model.renderMode = mode;
-    this.refreshHUD();
-  }
-
   initForSize(w, h) {
     model.viewW = w;
     model.viewH = h;
-    this.setRenderMode(0);
+    model.setRenderMode(0);
     graphics.initBuffers();
     this.resize();
   }
 
   resize() {
     const { rowW, rowH, colW, colH } = this.calibrate();
+    const viewW = model.viewW;
+    const viewH = model.viewH;
 
     const padding = 20;
     const gap = 10;
@@ -274,14 +301,14 @@ class Gui {
     const uiH1 = rowH * uiScale1;
     const availW1 = vW - canvasBorder;
     const availH1 = Math.max(1, vH - gap - uiH1 - canvasBorder);
-    const canvasScale1 = Math.min(availW1 / model.viewW, availH1 / model.viewH);
+    const canvasScale1 = Math.min(availW1 / viewW, availH1 / viewH);
 
     // Calc Config 2: RIGHT
     const uiScale2 = Math.min(1.0, vH / colH);
     const uiW2 = colW * uiScale2;
     const availW2 = Math.max(1, vW - gap - uiW2 - canvasBorder);
     const availH2 = vH - canvasBorder;
-    const canvasScale2 = Math.min(availW2 / model.viewW, availH2 / model.viewH);
+    const canvasScale2 = Math.min(availW2 / viewW, availH2 / viewH);
 
     let finalCanvasScale, finalUiScale, isVertical;
 
@@ -306,16 +333,23 @@ class Gui {
       this.uiContainer.style.transformOrigin = isVertical ? 'top center' : 'left center';
     }
 
-    const displayW = Math.floor(model.viewW * finalCanvasScale);
-    const displayH = Math.floor(model.viewH * finalCanvasScale);
-    this.canvas.width = displayW;
-    this.canvas.height = displayH;
-    this.canvas.style.width = displayW + 'px';
-    this.canvas.style.height = displayH + 'px';
+    const displayW = Math.floor(viewW * finalCanvasScale);
+    const displayH = Math.floor(viewH * finalCanvasScale);
+
+    this.setCanvasSize(displayW, displayH);
     this.canvas.style.display = 'block';
 
     if (this.doPrintLayoutExtents)
       this.printLayoutExtents(isVertical, finalCanvasScale, finalUiScale);
+
+    graphics.requestRender();
+  }
+
+  setCanvasSize(w, h) {
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.canvas.style.width = w + 'px';
+    this.canvas.style.height = h + 'px';
   }
 
   printLayoutExtents(isVertical, finalCanvasScale, finalUiScale) {
@@ -330,14 +364,47 @@ class Gui {
     console.log(`ui:      [${uRect.left.toFixed(1)}, ${uRect.top.toFixed(1)}] to [${uRect.right.toFixed(1)}, ${uRect.bottom.toFixed(1)}]`);
   }
 
+  saveImage() {
+    // Manual save/restore to avoid full resize() overhead
+    const origWidth = this.canvas.width;
+    const origHeight = this.canvas.height;
+
+    const viewW = model.viewW;
+    const viewH = model.viewH;
+    const renderMode = model.renderMode;
+
+    this.setCanvasSize(viewW, viewH);
+
+    // Direct call. We need to render immediately here, 
+    // not through requestAnimationFrame:
+    graphics.render();
+
+    const link = document.createElement('a');
+    const filename = `study_${viewW}x${viewH}_lod${renderMode}.png`;
+    link.download = filename;
+    link.href = this.canvas.toDataURL("image/png");
+    link.click();
+
+    // Restore
+    this.setCanvasSize(origWidth, origHeight);
+
+    // Resizing the canvas clears the WebGL backbuffer. 
+    // We must request a new frame to restore the visual "inspection" view:
+    graphics.requestRender();
+  }
+
+  advanceRenderMode(offset) {
+    model.setRenderMode(model.offsetRenderMode(offset));
+  }
+
   init() {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'ArrowRight') {
-        this.setRenderMode(model.advRenderMode(1));
+        this.advanceRenderMode(1);
         e.preventDefault();
       }
       if (e.code === 'ArrowLeft') {
-        this.setRenderMode(model.advRenderMode(-1));
+        this.advanceRenderMode(-1);
         e.preventDefault();
       }
     });
@@ -366,25 +433,14 @@ class Gui {
     });
 
     this.btnNext.addEventListener('click', () => {
-      this.setRenderMode(model.advRenderMode(1));
+      this.advanceRenderMode(1);
     });
 
     this.btnPrev.addEventListener('click', () => {
-      this.setRenderMode(model.advRenderMode(-1));
+      this.advanceRenderMode(-1);
     });
 
-    this.btnSave.addEventListener('click', () => {
-      this.canvas.width = model.viewW;
-      this.canvas.height = model.viewH;
-      graphics.render();
-      const link = document.createElement('a');
-      const filename = `study_${model.viewW}x${model.viewH}_lod${model.renderMode}.png`;
-      link.download = filename;
-      link.href = this.canvas.toDataURL("image/png");
-      link.click();
-      this.resize();
-    });
-
+    this.btnSave.addEventListener('click', () => this.saveImage());
     window.addEventListener('resize', () => this.resize());
   }
 }
@@ -446,17 +502,14 @@ const webgl = new Webgl();
 const model = new Model();
 const gui = new Gui();
 
-webgl.init();
-graphics.init(vsSource, fsSource, blitFsSource, mipFsSource);
-graphics.initBuffers();
-gui.init();
-gui.refreshHUD();
-gui.resize();
-renderMarkdown();
-
-function render() {
-  graphics.render();
-  requestAnimationFrame(render);
+function initGraphics() {
+  webgl.init();
+  graphics.init();
+  gui.resize();
 }
 
-requestAnimationFrame(render);
+gui.init();
+gui.refreshHUD();
+initGraphics();
+webgl.initContextLossHandling();
+renderMarkdown();

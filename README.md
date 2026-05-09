@@ -2,6 +2,8 @@
 
 This tool demonstrates whether the used `generateMipmap` implementation produces a correctly aligned scaled-down image across all mip levels. 
 
+[**Live Demo on Shadertoy**](https://www.shadertoy.com/view/s3l3RB)
+
 In some environments, certain texture dimensions cause the image to spatially shift at specific LOD levels.
 
 | ![shifting](gif/shifting.gif) | ![stable](gif/clean.gif) |

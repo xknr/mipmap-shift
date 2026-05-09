@@ -49,6 +49,11 @@ canvas {
   gap: 10px;
 }
 
+#action-panel {
+  flex: 0 0 auto;
+  display: none;
+}
+
 .panel-box label {
   font-size: 12px;
   color: #888;
