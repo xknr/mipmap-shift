@@ -1,74 +1,9 @@
 const MIN_TEXTURE_SIZE = 6;
 const MAX_TEXTURE_SIZE = 2048;
 
-class Graphics {
-  constructor(gl) {
-    this.gl = gl;
-    this.prog = null;
-    this.blitProg = null;
-    this.mipProg = null;
-    this.uTexLoc = null;
-    this.uAspectLoc = null;
-    this.uMipTexLoc = null;
-    this.uMipLodLoc = null;
-    this.tex = null;
-    this.fbo = null;
-    this.vao = null;
-    this.vbo = null;
-  }
 
-  init(vsSource, fsSource, blitFsSource, mipFsSource) {
-    this.prog = createProgram(this.gl, vsSource, fsSource);
-    this.blitProg = createProgram(this.gl, vsSource, blitFsSource);
-    this.mipProg = createProgram(this.gl, vsSource, mipFsSource);
-    this.uTexLoc = this.gl.getUniformLocation(this.blitProg, "uTex");
-    this.uAspectLoc = this.gl.getUniformLocation(this.prog, "uAspect");
-    this.uMipTexLoc = this.gl.getUniformLocation(this.mipProg, "uTex");
-    this.uMipLodLoc = this.gl.getUniformLocation(this.mipProg, "uLod");
-
-    this.vao = this.gl.createVertexArray();
-    this.gl.bindVertexArray(this.vao);
-    this.vbo = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vbo);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), this.gl.STATIC_DRAW);
-    this.gl.enableVertexAttribArray(0);
-    this.gl.vertexAttribPointer(0, 2, this.gl.FLOAT, false, 0, 0);
-  }
-
-  initBuffers(w, h, numLevels) {
-    if (this.tex) this.gl.deleteTexture(this.tex);
-    if (this.fbo) this.gl.deleteFramebuffer(this.fbo);
-
-    this.tex = this.gl.createTexture();
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.tex);
-    this.gl.texStorage2D(this.gl.TEXTURE_2D, numLevels, this.gl.RGBA8, w, h);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-
-    this.fbo = this.gl.createFramebuffer();
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fbo);
-    this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.tex, 0);
-  }
-}
-
-class Gui {
+class Model {
   constructor() {
-    this.canvas = document.getElementById('glCanvas');
-    this.hudLine1 = document.getElementById('hud-line1');
-    this.hudLine2 = document.getElementById('hud-line2');
-    this.resSelect = document.getElementById('res-select');
-    this.customControls = document.getElementById('custom-res-controls');
-    this.customW = document.getElementById('custom-w');
-    this.customH = document.getElementById('custom-h');
-    this.btnApplyCustom = document.getElementById('btn-apply-custom');
-    this.btnNext = document.getElementById('btn-next');
-    this.btnPrev = document.getElementById('btn-prev');
-    this.btnSave = document.getElementById('btn-save');
-    this.uiContainer = document.getElementById('ui-container');
-    this.appContainer = document.getElementById('app-container');
-
     this.viewW = 980;
     this.viewH = 808;
     this.renderMode = 0;
@@ -88,16 +23,166 @@ class Gui {
     return levels;
   }
 
+  advRenderMode(offset) {
+    return (this.renderMode + offset + this.numLevels) % this.numLevels;
+  }
+}
+
+class Webgl {
+  init() {
+    this.gl = gui.canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
+    if (!this.gl) {
+      alert("WebGL 2 not supported");
+      throw new Error("WebGL 2 not supported");
+    }
+  }
+  createShader(type, src) {
+    const gl = this.gl;
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      throw new Error('shader compile error');
+    }
+    return s;
+  }
+
+  createProgram(vSrc, fSrc) {
+    const gl = this.gl;
+    const program = gl.createProgram();
+    const vShader = this.createShader(gl.VERTEX_SHADER, vSrc);
+    const fShader = this.createShader(gl.FRAGMENT_SHADER, fSrc);
+    gl.attachShader(program, vShader);
+    gl.attachShader(program, fShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(program));
+      throw new Error('program link error');
+    }
+    gl.deleteShader(vShader);
+    gl.deleteShader(fShader);
+    return program;
+  }
+}
+
+class Graphics {
+  constructor() {
+    this.prog = null;
+    this.blitProg = null;
+    this.mipProg = null;
+    this.uTexLoc = null;
+    this.uAspectLoc = null;
+    this.uMipTexLoc = null;
+    this.uMipLodLoc = null;
+    this.tex = null;
+    this.fbo = null;
+    this.vao = null;
+    this.vbo = null;
+  }
+
+  init(vsSource, fsSource, blitFsSource, mipFsSource) {
+    const gl = webgl.gl;
+    this.prog = webgl.createProgram(vsSource, fsSource);
+    this.blitProg = webgl.createProgram(vsSource, blitFsSource);
+    this.mipProg = webgl.createProgram(vsSource, mipFsSource);
+    this.uTexLoc = gl.getUniformLocation(this.blitProg, "uTex");
+    this.uAspectLoc = gl.getUniformLocation(this.prog, "uAspect");
+    this.uMipTexLoc = gl.getUniformLocation(this.mipProg, "uTex");
+    this.uMipLodLoc = gl.getUniformLocation(this.mipProg, "uLod");
+
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    this.vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  initBuffers() {
+    const numLevels = model.calculateNumLevels();
+    const w = model.viewW;
+    const h = model.viewH;
+
+    const gl = webgl.gl;
+    if (this.tex) gl.deleteTexture(this.tex);
+    if (this.fbo) gl.deleteFramebuffer(this.fbo);
+
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texStorage2D(gl.TEXTURE_2D, numLevels, gl.RGBA8, w, h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    this.fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.tex, 0);
+  }
+
+  render() {
+    const gl = webgl.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.viewport(0, 0, model.viewW, model.viewH);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(this.prog);
+    gl.uniform1f(this.uAspectLoc, model.viewW / model.viewH);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    const targetW = gui.canvas.width;
+    const targetH = gui.canvas.height;
+    const renderMode = model.renderMode;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, targetW, targetH);
+
+    gl.useProgram(this.mipProg);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
+    gl.uniform1f(this.uMipLodLoc, renderMode);
+
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  }
+}
+
+class Gui {
+  constructor() {
+    this.canvas = document.getElementById('glCanvas');
+    this.hudLine1 = document.getElementById('hud-line1');
+    this.hudLine2 = document.getElementById('hud-line2');
+    this.resSelect = document.getElementById('res-select');
+    this.customControls = document.getElementById('custom-res-controls');
+    this.customW = document.getElementById('custom-w');
+    this.customH = document.getElementById('custom-h');
+    this.btnApplyCustom = document.getElementById('btn-apply-custom');
+    this.btnNext = document.getElementById('btn-next');
+    this.btnPrev = document.getElementById('btn-prev');
+    this.btnSave = document.getElementById('btn-save');
+    this.uiContainer = document.getElementById('ui-container');
+    this.appContainer = document.getElementById('app-container');
+  }
+
   refreshHUD() {
-    const lod = this.renderMode;
-    let w = this.viewW;
-    let h = this.viewH;
+    const lod = model.renderMode;
+    let w = model.viewW;
+    let h = model.viewH;
     for (let i = 0; i < lod; i++) {
       w = Math.max(1, Math.floor(w / 2));
       h = Math.max(1, Math.floor(h / 2));
     }
     const ratio = (w / h).toFixed(4);
-    const baseRatio = (this.viewW / this.viewH).toFixed(4);
+    const baseRatio = (model.viewW / model.viewH).toFixed(4);
     const delta = (ratio - baseRatio).toFixed(4);
     const deltaStr = (delta >= 0 ? "+" : "") + delta;
 
@@ -106,24 +191,15 @@ class Gui {
   }
 
   setRenderMode(mode) {
-    this.renderMode = mode;
+    model.renderMode = mode;
     this.refreshHUD();
   }
 
-  advRenderMode(offset) {
-    return (this.renderMode + offset + this.numLevels) % this.numLevels;
-  }
-
-  initBuffers() {
-    const numLevels = this.calculateNumLevels();
-    graphics.initBuffers(this.viewW, this.viewH, numLevels);
-  }
-
   initForSize(w, h) {
-    this.viewW = w;
-    this.viewH = h;
+    model.viewW = w;
+    model.viewH = h;
     this.setRenderMode(0);
-    this.initBuffers();
+    graphics.initBuffers();
     this.resize();
   }
 
@@ -150,7 +226,7 @@ class Gui {
 
     const availW1 = winW;
     const availH1 = Math.max(1, winH - gap - uiScaledH1);
-    const canvasScale1 = Math.min(availW1 / this.viewW, availH1 / this.viewH);
+    const canvasScale1 = Math.min(availW1 / model.viewW, availH1 / model.viewH);
 
     // Test Config 2: Right (app row, ui col)
     this.appContainer.style.flexDirection = 'row';
@@ -164,7 +240,7 @@ class Gui {
 
     const availW2 = Math.max(1, winW - gap - uiScaledW2);
     const availH2 = winH;
-    const canvasScale2 = Math.min(availW2 / this.viewW, availH2 / this.viewH);
+    const canvasScale2 = Math.min(availW2 / model.viewW, availH2 / model.viewH);
 
     let finalCanvasScale;
     if (canvasScale1 > canvasScale2) {
@@ -191,9 +267,10 @@ class Gui {
 
     this.canvas.style.display = 'block';
 
-    let displayW = Math.max(1, Math.floor(this.viewW * finalCanvasScale));
-    let displayH = Math.max(1, Math.floor(this.viewH * finalCanvasScale));
+    let displayW = Math.max(1, Math.floor(model.viewW * finalCanvasScale));
+    let displayH = Math.max(1, Math.floor(model.viewH * finalCanvasScale));
 
+    console.log(`resizing canvas to ${displayW}x${displayH} from ${model.viewW}x${model.viewH}`);
     this.canvas.width = displayW;
     this.canvas.height = displayH;
     this.canvas.style.width = displayW + 'px';
@@ -201,24 +278,18 @@ class Gui {
   }
 }
 
+const model = new Model();
+const webgl = new Webgl();
 const gui = new Gui();
-const gl = gui.canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
-if (!gl) {
-  alert("WebGL 2 not supported");
-  throw new Error("WebGL 2 not supported");
-}
-
-const graphics = new Graphics(gl);
-
-
+const graphics = new Graphics();
 
 window.addEventListener('keydown', (e) => {
   if (e.code === 'ArrowRight') {
-    gui.setRenderMode(gui.advRenderMode(1));
+    gui.setRenderMode(model.advRenderMode(1));
     e.preventDefault();
   }
   if (e.code === 'ArrowLeft') {
-    gui.setRenderMode(gui.advRenderMode(-1));
+    gui.setRenderMode(model.advRenderMode(-1));
     e.preventDefault();
   }
 });
@@ -247,29 +318,21 @@ gui.btnApplyCustom.addEventListener('click', () => {
 });
 
 gui.btnNext.addEventListener('click', () => {
-  gui.setRenderMode(gui.advRenderMode(1));
+  gui.setRenderMode(model.advRenderMode(1));
 });
 
 gui.btnPrev.addEventListener('click', () => {
-  gui.setRenderMode(gui.advRenderMode(-1));
+  gui.setRenderMode(model.advRenderMode(-1));
 });
 
 gui.btnSave.addEventListener('click', () => {
-  gui.canvas.width = gui.viewW;
-  gui.canvas.height = gui.viewH;
+  gui.canvas.width = model.viewW;
+  gui.canvas.height = model.viewH;
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, graphics.fbo);
-  gl.viewport(0, 0, gui.viewW, gui.viewH);
-  gl.useProgram(graphics.prog);
-  gl.uniform1f(graphics.uAspectLoc, gui.viewW / gui.viewH);
-  gl.bindVertexArray(graphics.vao);
-  gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
-  gl.generateMipmap(gl.TEXTURE_2D);
-  drawOutput(gui.viewW, gui.viewH);
+  graphics.render();
 
   const link = document.createElement('a');
-  const filename = `study_${gui.viewW}x${gui.viewH}_lod${gui.renderMode}.png`;
+  const filename = `study_${model.viewW}x${model.viewH}_lod${model.renderMode}.png`;
   link.download = filename;
   link.href = gui.canvas.toDataURL("image/png");
   link.click();
@@ -308,8 +371,7 @@ void main() {
   } else {
     outColor = vec4(vec3(val), 1.0);
   }
-}
-`;
+}`;
 
 const blitFsSource = `#version 300 es
 precision highp float;
@@ -318,8 +380,7 @@ in vec2 vTex;
 out vec4 outColor;
 void main() {
   outColor = texture(uTex, vTex);
-}
-`;
+}`;
 
 const mipFsSource = `#version 300 es
 precision highp float;
@@ -329,72 +390,17 @@ in vec2 vTex;
 out vec4 outColor;
 void main() {
   outColor = textureLod(uTex, vTex, uLod);
-}
-`;
+}`;
 
-function createShader(gl, type, src) {
-  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(s));
-    throw new Error('shader compile error');
-  }
-  return s;
-}
-
-function createProgram(gl, vSrc, fSrc) {
-  const program = gl.createProgram();
-  const vShader = createShader(gl, gl.VERTEX_SHADER, vSrc);
-  const fShader = createShader(gl, gl.FRAGMENT_SHADER, fSrc);
-  gl.attachShader(program, vShader);
-  gl.attachShader(program, fShader);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error(gl.getProgramInfoLog(program));
-    throw new Error('program link error');
-  }
-  gl.deleteShader(vShader);
-  gl.deleteShader(fShader);
-  return program;
-}
-
+webgl.init();
 graphics.init(vsSource, fsSource, blitFsSource, mipFsSource);
-gui.initBuffers();
+graphics.initBuffers();
 gui.refreshHUD();
 window.addEventListener('resize', () => gui.resize());
 gui.resize();
 
-function drawOutput(targetW, targetH) {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, targetW, targetH);
-
-  gl.useProgram(graphics.mipProg);
-  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST);
-  gl.uniform1f(graphics.uMipLodLoc, gui.renderMode);
-
-  gl.bindVertexArray(graphics.vao);
-  gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-}
-
 function render() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, graphics.fbo);
-  gl.viewport(0, 0, gui.viewW, gui.viewH);
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.useProgram(graphics.prog);
-  gl.uniform1f(graphics.uAspectLoc, gui.viewW / gui.viewH);
-  gl.bindVertexArray(graphics.vao);
-  gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-
-  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
-  gl.generateMipmap(gl.TEXTURE_2D);
-
-  drawOutput(gui.canvas.width, gui.canvas.height);
-
-  gl.bindTexture(gl.TEXTURE_2D, graphics.tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
+  graphics.render();
   requestAnimationFrame(render);
 }
 
